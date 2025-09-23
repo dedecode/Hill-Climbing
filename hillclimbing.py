@@ -1,5 +1,6 @@
 import copy
 import random
+import numpy as np
 
 def gerar_vizinhos_knapsack(solucao, n_vizinhos=10):
     """
@@ -46,7 +47,7 @@ class HillClimbing:
         self.maximizar = maximizar
         self.historico = []
 
-    def executar(self, solucao_inicial, max_iteracoes=1000, verbose=False):
+    def executar(self, solucao_inicial, max_iteracoes=1000, verbose=False, estocastico=False, probabilidade_pior=0.1):
         """
         Executa o algoritmo Hill Climbing
 
@@ -54,6 +55,8 @@ class HillClimbing:
             solucao_inicial: solução inicial
             max_iteracoes: número máximo de iterações
             verbose: imprimir progresso
+            estocastico: True para usar a versão estocástica
+            probabilidade_pior: probabilidade de aceitar uma solução pior no modo estocástico
 
         Returns:
             tuple: (melhor_solucao, melhor_fitness, historico)
@@ -91,8 +94,14 @@ class HillClimbing:
                 if eh_melhor:
                     melhor_vizinho = vizinho
                     melhor_fitness_vizinho = fitness_vizinho
+                elif estocastico and random.random() < probabilidade_pior:
+                    # Na versão estocástica, podemos aceitar uma solução pior
+                    melhor_vizinho = vizinho
+                    melhor_fitness_vizinho = fitness_vizinho
+                    break  # Aceita o primeiro vizinho "pior" que passar no teste de probabilidade
 
-            # Se encontrou vizinho melhor, move para ele
+
+            # Se encontrou vizinho melhor (ou um pior aceito no modo estocástico), move para ele
             if melhor_vizinho is not None:
                 solucao_atual = copy.deepcopy(melhor_vizinho)
                 fitness_atual = melhor_fitness_vizinho
@@ -113,7 +122,7 @@ class HillClimbing:
             print(f"Fitness final: {fitness_atual:.4f}")
 
         return solucao_atual, fitness_atual, self.historico
-    
+
 if __name__ == "__main__":
     import sys
     from knapsack import knapsack
@@ -124,9 +133,9 @@ if __name__ == "__main__":
     DIM = 20
     MAX_ITERACOES = 200
 
-
-    # Inicializar e executar Hill Climbing
-    melhores_fitness = []
+    # --- Execução do Hill Climbing Padrão ---
+    print("\n=== EXECUTANDO HILL CLIMBING PADRÃO ===")
+    melhores_fitness_padrao = []
     for i in range(30):
         # Gerar solução inicial aleatória
         solucao_inicial = [int(random.random() > 0.8) for _ in range(DIM)]
@@ -137,27 +146,56 @@ if __name__ == "__main__":
             maximizar=True,
         )
 
-        melhor_solucao, melhor_fitness, historico = hill_climbing.executar(
-            solucao_inicial, max_iteracoes=MAX_ITERACOES, verbose=True
+        _, melhor_fitness, _ = hill_climbing.executar(
+            solucao_inicial, max_iteracoes=MAX_ITERACOES, verbose=False # verbose=False para não poluir o output
         )
-        melhores_fitness.append(melhor_fitness)
+        melhores_fitness_padrao.append(melhor_fitness)
 
-    print(melhores_fitness)
-    
-    # total_melhores_fitness = sum(melhores_fitness)
-    # numero_elementos = len(melhores_fitness)
-    # media_melhores_fitness = total_melhores_fitness / numero_elementos  
-    # print(media_melhores_fitness)
-    
-    np.savetxt("resultados_finais",melhores_fitness, fmt='%d')
-    print(np.std(melhores_fitness))
-    print(np.mean(melhores_fitness))
-    # print("\n=== RESULTADOS FINAIS ===")
-    # print(f"Solução inicial: {solucao_inicial}")
-    # print(f"Melhor solução: {melhor_solucao}")
-    # print(f"Melhor valor total: {melhor_fitness}")
-    # peso_total = knapsack(melhor_solucao, dim=DIM)[1]
-    # print(f"Peso total da melhor solução: {peso_total}")
+    print("Resultados Hill Climbing Padrão:", melhores_fitness_padrao)
+    np.savetxt("resultados_finais.txt", melhores_fitness_padrao, fmt='%d')
+    print("Média (Padrão):", np.mean(melhores_fitness_padrao))
+    print("Desvio Padrão (Padrão):", np.std(melhores_fitness_padrao))
 
-    # print("\nHistórico de fitness ao longo das iterações:")
-    # print(historico)
+    # --- Execução do Hill Climbing Estocástico ---
+    print("\n=== EXECUTANDO HILL CLIMBING ESTOCÁSTICO ===")
+    melhores_fitness_estocastico = []
+    for i in range(30):
+        # Gerar solução inicial aleatória
+        solucao_inicial = [int(random.random() > 0.8) for _ in range(DIM)]
+        
+        hill_climbing_estocastico = HillClimbing(    
+            funcao_fitness=lambda sol: knapsack(sol, dim=DIM)[0],  # Maximizar valor total
+            gerar_vizinhos=gerar_vizinhos_knapsack,
+            maximizar=True,
+        )
+
+        _, melhor_fitness, _ = hill_climbing_estocastico.executar(
+            solucao_inicial, max_iteracoes=MAX_ITERACOES, verbose=False, estocastico=True, probabilidade_pior=0.05
+        )
+        melhores_fitness_estocastico.append(melhor_fitness)
+
+    print("Resultados Hill Climbing Estocástico:", melhores_fitness_estocastico)
+    np.savetxt("resultados_finais2.txt", melhores_fitness_estocastico, fmt='%d')
+    print("Média (Estocástico):", np.mean(melhores_fitness_estocastico))
+    print("Desvio Padrão (Estocástico):", np.std(melhores_fitness_estocastico))
+
+    #print p comparar
+
+    print("\n\n" + "="*50)
+    print("=== COMPARAÇÃO DOS ALGORITMOS ===")
+    print("="*50)
+    print(f"{'Métrica':<20} | {'Hill Climbing Padrão':^20} | {'Hill Climbing Estocástico':^20}")
+    print("-"*50)
+
+    media_padrao = np.mean(melhores_fitness_padrao)
+    std_padrao = np.std(melhores_fitness_padrao)
+    max_padrao = np.max(melhores_fitness_padrao)
+
+    media_estocastico = np.mean(melhores_fitness_estocastico)
+    std_estocastico = np.std(melhores_fitness_estocastico)
+    max_estocastico = np.max(melhores_fitness_estocastico)
+
+    print(f"{'Média do Fitness':<20} | {media_padrao:^20.2f} | {media_estocastico:^20.2f}")
+    print(f"{'Desvio Padrão':<20} | {std_padrao:^20.2f} | {std_estocastico:^20.2f}")
+    print(f"{'Melhor Resultado':<20} | {max_padrao:^20} | {max_estocastico:^20}")
+    print("="*50)
